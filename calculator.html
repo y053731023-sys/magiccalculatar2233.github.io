@@ -167,7 +167,7 @@
                     return;
                 }
                 if (isMagicMode) {
-                    // 魔術模式：優先輸入鬼影數字
+                    // 魔術模式：只輸入鬼影數字
                     if (magicIndex < magicRemainder.length) {
                         const ghostChar = magicRemainder[magicIndex];
                         if (inputExpression === '0') {
@@ -176,10 +176,10 @@
                             setInputExpression(prev => prev + ghostChar);
                         }
                         setMagicIndex(prev => prev + 1);
-                        return;
                     }
-                    // 如果鬼影數字用完了 (Overflow)，自動切換回正常輸入
-                    // 這樣螢幕會顯示真實按下的數字，避免卡住
+                    // 修改重點：當鬼影數字輸入完畢後，直接 return，不執行下方的 handleNewInput
+                    // 這樣按鍵就會「卡住」，不會顯示多餘的數字
+                    return;
                 }
                 handleNewInput(num, false);
             };
