@@ -40,7 +40,7 @@
             -webkit-backdrop-filter: blur(24px); 
             backdrop-filter: blur(24px); 
         }
-        
+
         * { -webkit-tap-highlight-color: transparent; }
 
         .safe-pb {
@@ -94,10 +94,6 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
         );
 
-        const SettingsIcon = ({ className }) => (
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        );
-
         const MagicCalculator = () => {
             const [inputExpression, setInputExpression] = useState('0');
             const [lastExpression, setLastExpression] = useState('');
@@ -109,6 +105,7 @@
 
             // Magic State
             const [isMagicMode, setIsMagicMode] = useState(false);
+            const [customTarget, setCustomTarget] = useState(null);
             const [magicRemainder, setMagicRemainder] = useState('');
             const [magicIndex, setMagicIndex] = useState(0);
             const [debugMode, setDebugMode] = useState(false);
@@ -118,6 +115,9 @@
             };
 
             const getTargetNumber = () => {
+                // 如果有設定自定義目標，優先使用
+                if (customTarget !== null) return customTarget;
+
                 const now = new Date();
                 const month = String(now.getMonth() + 1);
                 const day = String(now.getDate()).padStart(2, '0');
@@ -177,8 +177,6 @@
                         }
                         setMagicIndex(prev => prev + 1);
                     }
-                    // 修改重點：當鬼影數字輸入完畢後，直接 return，不執行下方的 handleNewInput
-                    // 這樣按鍵就會「卡住」，不會顯示多餘的數字
                     return;
                 }
                 handleNewInput(num, false);
@@ -229,17 +227,12 @@
                 setActiveOp(null);
                 
                 let finalResult;
-                
-                // 邏輯優化：
-                // 不管是否在魔術模式，我們都計算螢幕上「當前顯示」的算式結果。
-                // 1. 正常魔術：鬼影數字正確輸入 -> 算式結果 = 目標時間。
-                // 2. 失誤溢出：鬼影數字 + 多按的真實數字 -> 算式結果 = 真實數學結果。
-                // 這樣可以確保計算機永遠「誠實」，不會因為多按了一位數而顯示不合理的答案。
                 finalResult = safeCalculate(inputExpression);
 
                 if (isMagicMode) {
                     setIsMagicMode(false);
                     setMagicRemainder('');
+                    setCustomTarget(null); // 結束後重置自定義目標
                 }
 
                 setLastExpression(formatDisplay(inputExpression) + ' =');
@@ -299,11 +292,17 @@
             // 魔術觸發邏輯
             const toggleMagicMode = () => {
                 triggerHaptic();
+                
                 if (isMagicMode) {
                     setIsMagicMode(false);
+                    setCustomTarget(null);
                     return;
                 }
-                const target = getTargetNumber();
+
+                setCustomTarget(null);
+                const target = getTargetNumber(); // 此時必定取得時間
+
+                // 計算鬼影餘數
                 let currentExpr = inputExpression;
                 if (['+', '-', '*', '/'].includes(currentExpr.slice(-1))) {
                     currentExpr = currentExpr.slice(0, -1);
@@ -312,9 +311,9 @@
                 const currentVal = safeCalculate(currentExpr);
                 if (currentVal === 'Error') return;
                 
-                // 反推需要的數字 (預設用減法)
+                // 如果螢幕為 0，鬼影餘數就是目標數字本身
+                // 如果螢幕已有數字，鬼影餘數是 (目標 - 目前)
                 let remainder = target - currentVal;
-                if (remainder < 0) remainder = 999999; 
                 
                 setMagicRemainder(String(remainder));
                 setMagicIndex(0);
@@ -356,17 +355,31 @@
                     }
                 }
 
+                let content = icon ? icon : text;
+                // 處理小數點按鍵的顯示內容：加入 transformOrigin 以修正位移
+                if (text === '.') {
+                    content = (
+                        <span 
+                            className={`transition-transform duration-500 ease-in-out block ${isMagicMode ? 'scale-[1.8] font-medium' : 'scale-100'}`}
+                            style={{ transformOrigin: '50% 65%' }}
+                        >
+                            .
+                        </span>
+                    );
+                }
+
                 return (
                 <button 
                     onClick={onClick} 
                     className={`
+                        relative
                         ${wide ? 'col-span-2 w-auto pl-[34px] text-left items-center justify-start rounded-[44px]' : 'w-full aspect-square justify-center rounded-full'}
                         ${btnColor}
                         ${fontSize} font-light leading-none flex items-center select-none btn-press ${pressEffect} transition-all duration-100
                     `}
                     style={{ WebkitTapHighlightColor: 'transparent' }}
                 >
-                    {icon ? icon : text}
+                    {content}
                 </button>
                 );
             };
@@ -387,16 +400,12 @@
                                 <ClockIcon className="w-6 h-6" />
                              </button>
                              
-                             {/* 觸發開關：點擊右側小鍵盤 (包含狀態指示燈) */}
+                             {/* 觸發開關：點擊右側圖示 */}
                              <div 
                                 className="w-10 h-10 rounded-full flex items-center justify-center border border-white/30 text-white cursor-pointer active:opacity-50 transition-opacity relative"
                                 onClick={toggleMagicMode}
                              >
                                 <CalculatorIcon className="w-6 h-6" />
-                                {/* 魔術狀態指示燈：極小的紅點，僅供表演者確認 */}
-                                {isMagicMode && (
-                                    <div className="absolute top-0 right-0 w-1.5 h-1.5 bg-red-600 rounded-full shadow-sm"></div>
-                                )}
                              </div>
                         </div>
 
@@ -481,6 +490,7 @@
                                     <span className={isMagicMode ? "text-green-600" : "text-red-600"}>{isMagicMode ? "ON" : "OFF"}</span>
                                 </div>
                                 <div>Target: {getTargetNumber()}</div>
+                                <div>Custom: {customTarget ? "YES" : "NO"}</div>
                                 {isMagicMode && <div>Ghost: {magicRemainder}</div>}
                             </div>
                         )}
